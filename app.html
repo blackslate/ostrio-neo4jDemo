@@ -1,0 +1,21 @@
+<head>
+  <title>meteor_servercall</title>
+</head>
+
+<body>
+  {{> simple}}
+  {{> passData}}
+</body>
+
+<template name="simple">
+  <h1>Calling serve method</h1>
+  <input type="button" value="Call" />
+  <div id="simpleResult">{{result}}</div>
+</template>
+
+<template name="passData">
+  <h1>Passing data to server method</h1>
+  <span>Name: </span><input type="text" value="Nachiket"/>
+  <input type="button" value="Call" />
+  <div id="passDataResult">{{result}}</div>
+</template>
