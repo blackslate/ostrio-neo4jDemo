@@ -1,53 +1,88 @@
 
-
 console.log ("Script loaded")
 
 if (Meteor.isClient) {
-  Template.simple.helpers({
-    result: function () {
-      return Session.get('serverSimpleResponse') || ""
+  ;(function (){
+    Meteor.call('getNodes', callback) // or ..., null, callback)
+    function callback(error, data) {
+      //console.log(error, data)
+      Session.set("nodes", data)
     }
-  })
-  Template.simple.events({
-    'click input' : function () {
-      Meteor.call('getCurrentTime',function(err, response) {
-        Session.set('serverSimpleResponse', response)
-      })
-    }
-  })
+  })()
 
-  Template.passData.helpers({
-    result: function () {
-      return Session.get('serverDataResponse') || ""
+  Template.nodes.helpers({
+    nodes: function () {
+      return Session.get('nodes')
+    }
+  , selected: function () {
+      return Session.get('selectedNode') || "No nodes selected"
     }
   })
-  Template.passData.events({
-    'click input[type=button]' : function () {
-      Meteor.call('welcome', $('input[type=text]').val(), function(err,response) {
-        if(err) {
-          Session.set('serverDataResponse', "Error:" + err.reason)
-          return
-        }
-        Session.set('serverDataResponse', response)
-      })
+  Template.nodes.events({
+    'click select' : function () {
+      var selectedNode = $("#nodes option:selected").text()
+      Session.set("selectedNode", selectedNode)
     }
   })
 }
 
 if (Meteor.isServer) {
-  Meteor.startup(function () {
-  Meteor.methods({
-    getCurrentTime: function () {
-      console.log('on server, getCurrentTime called')
-      return new Date()
-    },
+  var db = new Neo4jDB(
+    'http://localhost:7474'
+  , { username: 'neo4j', password: '1234'}
+  )
 
-    welcome: function (name) {
-      console.log('on server, welcome called with name: ', name)
-      if(name==undefined || name.length<=0) {
-          throw new Meteor.Error(404, "Please enter your name")
-      }
-        return "Welcome " + name
+  var nodesCursor = db.query(
+    'MERGE ' +
+    '(hello {name:"Hello"})-[link:LINK]->(world {name: "World"}) ' +
+    'RETURN hello, link, world'
+  )
+
+  Meteor.startup(function () {
+
+    Meteor.methods({
+      getNodes: function () {
+        nodesArray = nodesCursor.fetch()
+  
+        console.log("getNodes called")
+        // [ { hello: 
+        //  { _service: [Object],
+        //    name: 'Hello',
+        //    id: 6,
+        //    labels: [],
+        //    metadata: [Object] },
+        // link: 
+        //  { _service: [Object],
+        //    id: 1,
+        //    type: 'LINK',
+        //    metadata: [Object],
+        //    start: '6',
+        //    end: '42' },
+        // world: 
+        //  { _service: [Object],
+        //    name: 'World',
+        //    id: 42,
+        //    labels: [],
+        //    metadata: [Object] } }
+        // , ... ]
+        
+        var nodes = []
+        var keys
+          , name
+
+        nodesArray.forEach(function (object) { // , index, array) {
+          keys = Object.keys(object)
+          for (var ii=0, key; key=keys[ii]; ii++) {
+            name = object[key].name // may be undefined
+            if (name) {
+              nodes.push({node: name})
+              console.log(ii, key, name)
+            }
+          }
+        })
+
+        console.log(nodes)
+        return nodes
       }
     })
   })

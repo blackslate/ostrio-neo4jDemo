@@ -1,21 +1,21 @@
 <head>
-  <title>meteor_servercall</title>
+  <title>ostrio neo4jdriver demo</title>
 </head>
 
 <body>
-  {{> simple}}
-  {{> passData}}
+  {{> nodes}}
 </body>
 
-<template name="simple">
-  <h1>Calling serve method</h1>
-  <input type="button" value="Call" />
-  <div id="simpleResult">{{result}}</div>
+<template name="nodes">
+  <h2>Nodes</h2>
+  <select name="nodes" id="nodes" size="16">
+  {{#each nodes}}
+    {{> node}}
+  {{/each}}
+  </select>
+  <p>{{selected}}</p>
 </template>
 
-<template name="passData">
-  <h1>Passing data to server method</h1>
-  <span>Name: </span><input type="text" value="Nachiket"/>
-  <input type="button" value="Call" />
-  <div id="passDataResult">{{result}}</div>
+<template name="node">
+  <option value={{node}}>{{node}}</option>
 </template>
