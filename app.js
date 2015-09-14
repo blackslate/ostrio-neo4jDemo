@@ -1,27 +1,5 @@
 
-var neo4jData = new Meteor.Collection( "neo4jData" )
-var subscription = "neo4jData"
-
-
 if (Meteor.isClient) {
-   
-  Tracker.autorun( function(){
-    console.log("Auto running")
-    Meteor.subscribe ( subscription )
-    var message = neo4jData.findOne({})
-    if ( message ) {
-      console.log( message.m )
-    }
-  })
-
-  ;(function (){
-    Meteor.call('getNodes', callback) // or ..., null, callback)
-    function callback(error, data) {
-      if (!error) {
-        Session.set("nodes", data)
-      }
-    }
-  })()
 
   Template.nodes.helpers({
     nodes: function () {
@@ -43,7 +21,7 @@ if (Meteor.isClient) {
       Meteor.call("getLinksForNode", id, callback)
 
       function callback (error, data) {
-        console.log(error, data)
+        console.log(error, JSON.stringify(data))
         if (!error) {
           Session.set("selectedNodeData", data)
         }
@@ -53,15 +31,6 @@ if (Meteor.isClient) {
 }
 
 if (Meteor.isServer) {
-  Meteor.publish( subscription, subscribeCallback)
-
-  function subscribeCallback(){
-    console.log("subscribeCallback")
-    var message = "Hello Client"
-    this.added ( subscription, "madeUpId1", { m: message } );
-    this.ready();
-  }
-
   var db = new Neo4jDB(
     'http://localhost:7474'
   , { username: 'neo4j', password: '1234'}
@@ -84,6 +53,24 @@ if (Meteor.isServer) {
     'WHERE id(node) = {id} ' +
     'RETURN node, link, endpoint'
 
+// function getUserProfile(req, callback) {
+//   ghapi.user.getFrom(req, callback);
+// }
+// var wrappedGetProfile = Meteor._wrapAsync(getUserProfile);
+
+// Meteor.methods({
+//   getProfile: function(username) {
+//     return wrappedGetProfile({user: username});
+//   }
+// });
+
+  function getQueryResult(request, callback) {
+    var query = request.query
+    var options = request.options
+    db.query(query, options, callback)
+  }
+  var wrappedQueryResult = Meteor.wrapAsync(getQueryResult)
+
   Meteor.startup(function () {
     Meteor.methods({
       getNodes: function () {
@@ -92,38 +79,9 @@ if (Meteor.isServer) {
       }
     , getLinksForNode: function (nodeId) {
         var options = { id: nodeId }
-        console.log(linksForNodeQuery, options)
-
-        db.query(linksForNodeQuery, options, callback)
-        function callback(error, cursor) {
-          console.log(error, cursor)
-          // cursor =
-          // { _cursor: [ 
-          //     { node: [Object]
-          //     , link: [Object]
-          //     , endpoint: [Object]
-          //     }
-          //   ]
-          // , length: 1
-          // , _current: 0
-          // , hasNext: false
-          // , hasPrevious: false
-          // }
-          
-          if (!error) {
-            result = fetchResult(cursor)
-// console.log(result)
-// { nodes: 
-//   [ { name: 'Hello', id: 36, labels: [], metadata: [Object] },
-//     { name: 'World', id: 37, labels: [], metadata: [Object] } ],
-//   links: 
-//   [ { id: 13,
-//       type: 'LINK',
-//       metadata: [Object],
-//       start: '36',
-//       end: '37' } ] }
-          }
-        }
+        var request = { query: linksForNodeQuery, options: options }
+        console.log(request)
+        return wrappedQueryResult(request)
       }
     })
   })
