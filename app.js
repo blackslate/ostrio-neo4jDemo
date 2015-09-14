@@ -39,53 +39,56 @@ if (Meteor.isServer) {
   )
 
   Meteor.startup(function () {
-
     Meteor.methods({
-           getNodes: function () {
-        nodesArray = nodesCursor.fetch()
-
-        var nodes = []
-        var ids = []
-        var keys
-          , node
-
-        nodesArray.forEach(function (object) {
-          keys = Object.keys(object)
-          for (var ii=0, key; key=keys[ii]; ii++) {
-           node = object[key]
-            if (node.labels instanceof Array) {
-              if (ids.indexOf(node.id) < 0) {
-                node = clone(node)
-                nodes.push(node)
-                ids.push(node.id)
-              }
-            }
-          }
-        })
-        return nodes
-
-        function clone(node) {
-          var copy = {}
-          var keys = Object.keys(node)
-          var value
-          
-          keys.forEach(function (key, index, array){
-            // The "_db" object contains circular references. Drop it.
-            if (key !== "_db") {
-              value = node[key]
-
-              if (typeof value === "object") {
-                // Ensure that the object contains no _db property
-                copy[key] = clone(value)
-              } else {
-                copy[key] = value
-              }
-            }
-          })
-
-          return copy
-        }
+      getNodes: function () {
+        nodesArray = fetchNodes(nodesCursor)
+        return nodesArray
       }
     })
   })
+
+  function fetchNodes(cursor) {
+    var nodesArray = cursor.fetch()
+    var nodes = []
+    var ids = []
+    var keys
+      , node
+
+    nodesArray.forEach(function (object) {
+      keys = Object.keys(object)
+      for (var ii=0, key; key=keys[ii]; ii++) {
+       node = object[key]
+        if (node.labels instanceof Array) {
+          if (ids.indexOf(node.id) < 0) {
+            node = clone(node)
+            nodes.push(node)
+            ids.push(node.id)
+          }
+        }
+      }
+    })
+    return nodes
+  }
+
+  function clone(node) {
+    var copy = {}
+    var keys = Object.keys(node)
+    var value
+    
+    keys.forEach(function (key, index, array){
+      // The "_db" object contains circular references. Drop it.
+      if (key !== "_db") {
+        value = node[key]
+
+        if (typeof value === "object") {
+          // Ensure that the object contains no _db property
+          copy[key] = clone(value)
+        } else {
+          copy[key] = value
+        }
+      }
+    })
+
+    return copy
+  }
 }
