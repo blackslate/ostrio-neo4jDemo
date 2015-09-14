@@ -13,10 +13,52 @@
     {{> node}}
   {{/each}}
   </select>
-  <p>{{selected}}</p>
-  <p>{{selectedData}}</p>
+  {{> selected}}
+  {{> selectedData}}
 </template>
 
 <template name="node">
-  <option value={{id}}>{{name}}</option>
+  <option value={{id}}>{{id}}: {{name}}</option>
+</template>
+
+<template name="selected">
+  {{#if selected}}
+    <h2>Node: {{selected.id}}</h2>
+    <ul>
+    {{#each properties}}
+      <li>{{key}}: {{value}}</li>
+    {{/each}}
+    </ul>
+  {{/if}}
+ </template>
+
+<template name="selectedData">
+  {{#if links.length}}
+    <p>Outgoing links to:</p>
+    {{#each links}}
+      {{> link}}
+    {{/each}}
+  {{/if}}
+</template>
+
+<template name="link">
+  <li>Node: {{id}}
+    <ul>
+      {{#each properties}}
+        <li>{{key}}: {{value}}</li>
+      {{/each}}
+      <li>LINKS
+        <ul> 
+        {{#each links}}
+          <li>id: {{id}}</li>
+          <ul>
+            {{#each properties}}
+              <li>{{key}}: {{value}}</li>
+            {{/each}}
+          </ul>
+        {{/each}}
+        </ul>
+      </li>
+    </ul>
+ </li>
 </template>

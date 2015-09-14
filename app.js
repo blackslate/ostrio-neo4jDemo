@@ -4,7 +4,13 @@ if (Meteor.isClient) {
     Meteor.call('getNodes', callback) // or ..., null, callback)
     function callback(error, data) {
       if (!error) {
+        // Peel off the { node: ... } wrapper
+        // [ { node: { name: 'Hello', id: 47, labels: [], metadata: {...} } }, ... ]
+        data = data.map(function(object){return object.node})
+        // [ { name: 'Hello', id: 47, labels: [], metadata: {...} },
+        // ... ]
         Session.set("nodes", data)
+        //console.log(data)
       }
     }
   })()
@@ -13,29 +19,143 @@ if (Meteor.isClient) {
     nodes: function () {
       return Session.get('nodes')
     }
-  , selected: function () {
-      return Session.get('selectedNode') || "No nodes selected"
-    }
-  , selectedData: function () {
-      return Session.get('selectedNodeData') || "No data available"
-    }
   })
+
   Template.nodes.events({
     'click select' : function () {
       var $selector = $("#nodes option:selected")
-      var name = $selector.text()
       var id = parseInt($selector.val(), 10)
-      Session.set("selectedNode", name)
+      var node = getNodeFromId(id)
+      Session.set("selectedNode", node)
       Meteor.call("getLinksForNode", id, callback)
 
       function callback (error, data) {
-        console.log(error, JSON.stringify(data))
+        //console.log(error, JSON.stringify(data))
+        // { "nodes": [
+        //     { "name": "World"
+        //     , "id": 48
+        //     , "labels": []
+        //     , "metadata":{"id":48,"labels":[]}
+        //     }
+        //   ]
+        // , "links": [
+        //     { "id": 12
+        //     , "type": "LINK"
+        //     , "metadata": {"id":12,"type":"LINK"}
+        //     , "start": 47
+        //     , "end": 48
+        //     }
+        //   ]
+        // }
+        
         if (!error) {
           Session.set("selectedNodeData", data)
         }
       }
     }
   })
+
+  Template.selected.helpers({
+    selected: function () {
+      var node = Session.get('selectedNode')
+      return node ? node : { id: "No node selected" }
+    }
+  , properties: function () {
+      var node = Session.get('selectedNode')
+      var properties = getPropertiesFor(node, ["id", "metadata"])
+      return properties
+    }
+  })
+
+  Template.selectedData.helpers({
+    links: function () { 
+      var nodes = []
+      var selected = Session.get('selectedNode')
+      if (selected) {
+        var linkData = Session.get('selectedNodeData')
+        var nodeArray = linkData.nodes
+        var linkArray = linkData.links
+
+        var properties
+          , links
+          , id
+
+        if (linkData) {
+          nodeArray.forEach(function (node) {
+            id = node.id
+            properties = getPropertiesFor(node, ["id", "metadata"])
+            links = getLinksFor(selected.id, id, linkArray)
+
+            node = { 
+              id: id
+            , properties: properties
+            , links: links
+            }
+
+            nodes.push(node)
+            //console.log(node)
+          })
+        }
+      }
+
+      //console.log(nodes.length)
+      return nodes
+    }
+  })
+
+  function getNodeFromId(id) {
+    var nodes = Session.get("nodes")
+    var result = null
+
+    nodes.every(function (node) {
+      if (node.id !== id) {
+        return true
+      } else {
+        result = node
+        // return false // break the loop
+      }
+    })
+
+    return result
+  }
+
+  function getPropertiesFor(node, ignore) {
+    var properties = []
+    ignore = (ignore instanceof Array) ? ignore : []
+
+    if (node) {
+      var keys = Object.keys(node)
+      keys.sort()
+      keys.forEach(function (key) {
+        if (ignore.indexOf(key) < 0) {
+          properties.push({key: key, value: node[key]})
+        }
+      })
+    }
+
+    return properties
+  }
+
+  function getLinksFor(source, target, linkArray) {
+    // [ { "id":12
+    //   , "type": "LINK"
+    //   , "metadata" :{"id":12,"type":"LINK"}
+    //   , "start": 47
+    //   , "end": 48
+    // } ]
+
+    var links = []
+    var ignore = ["start", "end", "id", "metadata"]
+
+    linkArray.forEach(function (link) {
+      if (link.start === source && link.end === target) {
+        properties = getPropertiesFor(link, ignore)
+        links.push({id: link.id, properties: properties})
+      }
+    })
+
+    return links
+  }
 }
 
 if (Meteor.isServer) {
@@ -45,11 +165,9 @@ if (Meteor.isServer) {
   )
 
   var nodesCursor = db.query(
-    'MERGE ' +
-    '(hello {name:"Hello"})-[link:LINK]->(world {name: "World"}) ' +
-    'RETURN hello, link, world'
+    'MATCH (node) RETURN node'
   )
-  console.log(nodesCursor)
+  //console.log(nodesCursor)
   // { _cursor: [ { hello: [Object], link: [Object], world: [Object] } ],
   // length: 1,
   // _current: 0,
@@ -57,9 +175,9 @@ if (Meteor.isServer) {
   // hasPrevious: false }
 
   var linksForNodeQuery = 
-    'MATCH path = (node)-[link]->(endpoint) ' +
+    'MATCH (node)-[link]->(endpoint) ' +
     'WHERE id(node) = {id} ' +
-    'RETURN path'
+    'RETURN link, endpoint'
   function getQueryResult(request, callback) {
     var query = request.query
     var options = request.options
@@ -70,15 +188,19 @@ if (Meteor.isServer) {
   Meteor.startup(function () {
     Meteor.methods({
       getNodes: function () {
-        nodesArray = fetchResult(nodesCursor).nodes
+        //nodesArray = fetchResult(nodesCursor).nodes
+        //console.log(nodesCursor)
+        nodesArray = nodesCursor.fetch()
+        //console.log(nodesArray)
         return nodesArray
       }
     , getLinksForNode: function (nodeId) {
         var options = { id: nodeId }
         var request = { query: linksForNodeQuery, options: options }
-        // console.log(request)
+        //console.log(request)
         cursor = wrappedQueryResult(request)
         result = fetchResult(cursor)
+        //console.log(result)
         return result
 
         // { "nodes": [ 
