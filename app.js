@@ -70,31 +70,34 @@ if (Meteor.isClient) {
   Template.selectedData.helpers({
     links: function () { 
       var nodes = []
+
       var selected = Session.get('selectedNode')
       if (selected) {
         var linkData = Session.get('selectedNodeData')
-        var nodeArray = linkData.nodes
-        var linkArray = linkData.links
-
-        var properties
-          , links
-          , id
-
         if (linkData) {
-          nodeArray.forEach(function (node) {
-            id = node.id
-            properties = getPropertiesFor(node, ["id", "metadata"])
-            links = getLinksFor(selected.id, id, linkArray)
+          var nodeArray = linkData.nodes
+          var linkArray = linkData.links
 
-            node = { 
-              id: id
-            , properties: properties
-            , links: links
-            }
+          var properties
+            , links
+            , id
 
-            nodes.push(node)
-            //console.log(node)
-          })
+          if (linkData) {
+            nodeArray.forEach(function (node) {
+              id = node.id
+              properties = getPropertiesFor(node, ["id", "metadata"])
+              links = getLinksFor(selected.id, id, linkArray)
+
+              node = { 
+                id: id
+              , properties: properties
+              , links: links
+              }
+
+              nodes.push(node)
+              //console.log(node)
+            })
+          }
         }
       }
 
@@ -165,9 +168,14 @@ if (Meteor.isServer) {
   )
 
   var nodesCursor = db.query(
-    'MATCH (node) RETURN node'
+    'MERGE ' +
+    '(hello {name: "Hello"})-[:LINK]->(world {name:"World"}) ' +
+    'WITH hello ' +
+    'MATCH (node) ' +
+    'RETURN node ' +
+    'LIMIT 10'
   )
-  //console.log(nodesCursor)
+  console.log(nodesCursor)
   // { _cursor: [ { hello: [Object], link: [Object], world: [Object] } ],
   // length: 1,
   // _current: 0,
