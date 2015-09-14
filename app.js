@@ -1,5 +1,13 @@
 
 if (Meteor.isClient) {
+  ;(function (){
+    Meteor.call('getNodes', callback) // or ..., null, callback)
+    function callback(error, data) {
+      if (!error) {
+        Session.set("nodes", data)
+      }
+    }
+  })()
 
   Template.nodes.helpers({
     nodes: function () {
@@ -41,7 +49,7 @@ if (Meteor.isServer) {
     '(hello {name:"Hello"})-[link:LINK]->(world {name: "World"}) ' +
     'RETURN hello, link, world'
   )
-  // console.log(nodesCursor)
+  console.log(nodesCursor)
   // { _cursor: [ { hello: [Object], link: [Object], world: [Object] } ],
   // length: 1,
   // _current: 0,
@@ -49,21 +57,9 @@ if (Meteor.isServer) {
   // hasPrevious: false }
 
   var linksForNodeQuery = 
-    'MATCH (node)-[link]->(endpoint) ' +
+    'MATCH path = (node)-[link]->(endpoint) ' +
     'WHERE id(node) = {id} ' +
-    'RETURN node, link, endpoint'
-
-// function getUserProfile(req, callback) {
-//   ghapi.user.getFrom(req, callback);
-// }
-// var wrappedGetProfile = Meteor._wrapAsync(getUserProfile);
-
-// Meteor.methods({
-//   getProfile: function(username) {
-//     return wrappedGetProfile({user: username});
-//   }
-// });
-
+    'RETURN path'
   function getQueryResult(request, callback) {
     var query = request.query
     var options = request.options
@@ -80,8 +76,41 @@ if (Meteor.isServer) {
     , getLinksForNode: function (nodeId) {
         var options = { id: nodeId }
         var request = { query: linksForNodeQuery, options: options }
-        console.log(request)
-        return wrappedQueryResult(request)
+        // console.log(request)
+        cursor = wrappedQueryResult(request)
+        result = fetchResult(cursor)
+        return result
+
+        // { "nodes": [ 
+        //     { "name": "Hello"
+        //     , "id": 36
+        //     , "labels": []
+        //     , "metadata": {
+        //         "id": 36
+        //       , "labels":[]
+        //       }
+        //     }
+        //   , { "name": "World"
+        //     , "id": 37
+        //     , "labels": []
+        //     , "metadata": {
+        //         "id": 37
+        //       , "labels": []
+        //       }
+        //     }
+        //   ]
+        // , "links": [
+        //     { "id": 13
+        //     , "type": "LINK"
+        //     , "metadata": {
+        //         "id": 13
+        //       , "type":"LINK"
+        //       }
+        //     , "start": "36"
+        //     , "end": "37"
+        //     }
+        //   ]
+        // }
       }
     })
   })
