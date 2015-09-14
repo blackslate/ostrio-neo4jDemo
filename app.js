@@ -41,48 +41,50 @@ if (Meteor.isServer) {
   Meteor.startup(function () {
 
     Meteor.methods({
-      getNodes: function () {
+           getNodes: function () {
         nodesArray = nodesCursor.fetch()
-  
-        console.log("getNodes called")
-        // [ { hello: 
-        //  { _service: [Object],
-        //    name: 'Hello',
-        //    id: 6,
-        //    labels: [],
-        //    metadata: [Object] },
-        // link: 
-        //  { _service: [Object],
-        //    id: 1,
-        //    type: 'LINK',
-        //    metadata: [Object],
-        //    start: '6',
-        //    end: '42' },
-        // world: 
-        //  { _service: [Object],
-        //    name: 'World',
-        //    id: 42,
-        //    labels: [],
-        //    metadata: [Object] } }
-        // , ... ]
-        
-        var nodes = []
-        var keys
-          , name
 
-        nodesArray.forEach(function (object) { // , index, array) {
+        var nodes = []
+        var ids = []
+        var keys
+          , node
+
+        nodesArray.forEach(function (object) {
           keys = Object.keys(object)
           for (var ii=0, key; key=keys[ii]; ii++) {
-            name = object[key].name // may be undefined
-            if (name) {
-              nodes.push({node: name})
-              console.log(ii, key, name)
+           node = object[key]
+            if (node.labels instanceof Array) {
+              if (ids.indexOf(node.id) < 0) {
+                node = clone(node)
+                nodes.push(node)
+                ids.push(node.id)
+              }
             }
           }
         })
-
-        console.log(nodes)
         return nodes
+
+        function clone(node) {
+          var copy = {}
+          var keys = Object.keys(node)
+          var value
+          
+          keys.forEach(function (key, index, array){
+            // The "_db" object contains circular references. Drop it.
+            if (key !== "_db") {
+              value = node[key]
+
+              if (typeof value === "object") {
+                // Ensure that the object contains no _db property
+                copy[key] = clone(value)
+              } else {
+                copy[key] = value
+              }
+            }
+          })
+
+          return copy
+        }
       }
     })
   })
