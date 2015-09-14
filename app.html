@@ -3,20 +3,10 @@
 </head>
 
 <body>
-  {{> nodes}}
+  {{> asynch}}
 </body>
 
-<template name="nodes">
-  <h2>Nodes</h2>
-  <select name="nodes" id="nodes" size="16">
-  {{#each nodes}}
-    {{> node}}
-  {{/each}}
-  </select>
-  <p>{{selected}}</p>
-  <p>{{selectedData}}</p>
-</template>
-
-<template name="node">
-  <option value={{id}}>{{name}}</option>
+<template name="asynch">
+  <button type="button">Run Asynch Query</button>
+  <p>{{result}}</p>
 </template>

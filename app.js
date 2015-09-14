@@ -1,29 +1,19 @@
 
 if (Meteor.isClient) {
 
-  Template.nodes.helpers({
-    nodes: function () {
-      return Session.get('nodes')
-    }
-  , selected: function () {
-      return Session.get('selectedNode') || "No nodes selected"
-    }
-  , selectedData: function () {
-      return Session.get('selectedNodeData') || "No data available"
+  Template.asynch.helpers({
+    result: function () {
+      return Session.get('result') || "No result available"
     }
   })
-  Template.nodes.events({
-    'click select' : function () {
-      var $selector = $("#nodes option:selected")
-      var name = $selector.text()
-      var id = parseInt($selector.val(), 10)
-      Session.set("selectedNode", name)
-      Meteor.call("getLinksForNode", id, callback)
+  Template.asynch.events({
+    'click button' : function () {
+      Meteor.call("getAsynchResult", callback)
 
       function callback (error, data) {
         console.log(error, JSON.stringify(data))
         if (!error) {
-          Session.set("selectedNodeData", data)
+          Session.set("result", data)
         }
       }
     }
@@ -36,34 +26,6 @@ if (Meteor.isServer) {
   , { username: 'neo4j', password: '1234'}
   )
 
-  var nodesCursor = db.query(
-    'MERGE ' +
-    '(hello {name:"Hello"})-[link:LINK]->(world {name: "World"}) ' +
-    'RETURN hello, link, world'
-  )
-  // console.log(nodesCursor)
-  // { _cursor: [ { hello: [Object], link: [Object], world: [Object] } ],
-  // length: 1,
-  // _current: 0,
-  // hasNext: false,
-  // hasPrevious: false }
-
-  var linksForNodeQuery = 
-    'MATCH (node)-[link]->(endpoint) ' +
-    'WHERE id(node) = {id} ' +
-    'RETURN node, link, endpoint'
-
-// function getUserProfile(req, callback) {
-//   ghapi.user.getFrom(req, callback);
-// }
-// var wrappedGetProfile = Meteor._wrapAsync(getUserProfile);
-
-// Meteor.methods({
-//   getProfile: function(username) {
-//     return wrappedGetProfile({user: username});
-//   }
-// });
-
   function getQueryResult(request, callback) {
     var query = request.query
     var options = request.options
@@ -73,15 +35,15 @@ if (Meteor.isServer) {
 
   Meteor.startup(function () {
     Meteor.methods({
-      getNodes: function () {
-        nodesArray = fetchResult(nodesCursor).nodes
-        return nodesArray
-      }
-    , getLinksForNode: function (nodeId) {
-        var options = { id: nodeId }
-        var request = { query: linksForNodeQuery, options: options }
+      getAsynchResult: function (nodeId) {
+        var options = {}
+        var query = 'MATCH (node) RETURN node'
+        var request = { query: query, options: options }
         console.log(request)
-        return wrappedQueryResult(request)
+        var cursor = wrappedQueryResult(request)
+        var result = fetchResult(cursor)
+        console.log(result)
+        return result
       }
     })
   })
