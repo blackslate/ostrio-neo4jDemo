@@ -1,19 +1,5 @@
 
 if (Meteor.isClient) {
-  ;(function (){
-    Meteor.call('getNodes', callback) // or ..., null, callback)
-    function callback(error, data) {
-      if (!error) {
-        // Peel off the { node: ... } wrapper
-        // [ { node: { name: 'Hello', id: 47, labels: [], metadata: {...} } }, ... ]
-        data = data.map(function(object){return object.node})
-        // [ { name: 'Hello', id: 47, labels: [], metadata: {...} },
-        // ... ]
-        Session.set("nodes", data)
-        //console.log(data)
-      }
-    }
-  })()
 
   Template.nodes.helpers({
     nodes: function () {
@@ -52,6 +38,9 @@ if (Meteor.isClient) {
           Session.set("selectedNodeData", data)
         }
       }
+    }
+  , 'click button': function () {
+      Meteor.call("getOstrioNodes", resetNodes)
     }
   })
 
@@ -106,6 +95,20 @@ if (Meteor.isClient) {
     }
   })
 
+  function resetNodes(error, data) {
+    if (!error) {
+      Session.set("nodes", data)
+      var selected = Session.get("selectedNode")
+      if (selected) {
+        var node = getNodeFromId(selected.id)
+        if (!node) {
+          // The currently selected node was deleted. Select nothing.
+          Session.set("selectedNode", null)
+        }
+      }
+    }
+  }
+
   function getNodeFromId(id) {
     var nodes = Session.get("nodes")
     var result = null
@@ -159,6 +162,9 @@ if (Meteor.isClient) {
 
     return links
   }
+
+  // Initialize display
+  Meteor.call('getOstrioNodes', resetNodes)
 }
 
 if (Meteor.isServer) {
@@ -167,80 +173,54 @@ if (Meteor.isServer) {
   , { username: 'neo4j', password: '1234'}
   )
 
-  var nodesCursor = db.query(
-    'MERGE ' +
-    '(hello {name: "Hello"})-[:LINK]->(world {name:"World"}) ' +
-    'WITH hello ' +
-    'MATCH (node) ' +
-    'RETURN node ' +
-    'LIMIT 10'
-  )
-  console.log(nodesCursor)
-  // { _cursor: [ { hello: [Object], link: [Object], world: [Object] } ],
-  // length: 1,
-  // _current: 0,
-  // hasNext: false,
-  // hasPrevious: false }
+  var cypher = {
+    mergeHelloWorld:
+      'MERGE ' +
+      '(hello:Ostrio {name: "Hello"})' +
+      '-[:OSTRIO]->' +
+      '(world:Ostrio {name:"World"}) ' +
+      'RETURN *'
+  , getOstrioNodes: 
+      'MATCH (node:Ostrio) ' +
+      'RETURN node'
+  , linksForNodeQuery:
+      'MATCH (node)-[link]->(endpoint) ' +
+      'WHERE id(node) = {id} ' +
+      'RETURN link, endpoint'
+  }
 
-  var linksForNodeQuery = 
-    'MATCH (node)-[link]->(endpoint) ' +
-    'WHERE id(node) = {id} ' +
-    'RETURN link, endpoint'
+  // Ensure that at least Hello and World exist
+  db.query(cypher.mergeHelloWorld)
+
+  // Use Fiber to deal with asynchronous calls
   function getQueryResult(request, callback) {
     var query = request.query
     var options = request.options
     db.query(query, options, callback)
   }
   var wrappedQueryResult = Meteor.wrapAsync(getQueryResult)
+  function launchQuery(request) {
+    cursor = wrappedQueryResult(request)
+    result = fetchResult(cursor)
+    return result
+  }
 
   Meteor.startup(function () {
     Meteor.methods({
-      getNodes: function () {
-        //nodesArray = fetchResult(nodesCursor).nodes
-        //console.log(nodesCursor)
-        nodesArray = nodesCursor.fetch()
-        //console.log(nodesArray)
-        return nodesArray
+      getOstrioNodes: function () {
+        var request = { query: cypher.getOstrioNodes }        
+        result = launchQuery(request)
+        // {nodes: Array[...], links: Array[0]}
+        result = result.nodes
+        return result
       }
     , getLinksForNode: function (nodeId) {
-        var options = { id: nodeId }
-        var request = { query: linksForNodeQuery, options: options }
-        //console.log(request)
-        cursor = wrappedQueryResult(request)
-        result = fetchResult(cursor)
-        //console.log(result)
+        var request = { 
+          query: cypher.linksForNodeQuery
+        , options: { id: nodeId }
+        }
+        result = launchQuery(request)
         return result
-
-        // { "nodes": [ 
-        //     { "name": "Hello"
-        //     , "id": 36
-        //     , "labels": []
-        //     , "metadata": {
-        //         "id": 36
-        //       , "labels":[]
-        //       }
-        //     }
-        //   , { "name": "World"
-        //     , "id": 37
-        //     , "labels": []
-        //     , "metadata": {
-        //         "id": 37
-        //       , "labels": []
-        //       }
-        //     }
-        //   ]
-        // , "links": [
-        //     { "id": 13
-        //     , "type": "LINK"
-        //     , "metadata": {
-        //         "id": 13
-        //       , "type":"LINK"
-        //       }
-        //     , "start": "36"
-        //     , "end": "37"
-        //     }
-        //   ]
-        // }
       }
     })
   })
