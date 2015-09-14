@@ -1,5 +1,5 @@
 
-console.log ("Script loaded")
+// console.log ("Script loaded")
 
 if (Meteor.isClient) {
   ;(function (){
@@ -45,9 +45,32 @@ if (Meteor.isServer) {
         nodesArray = nodesCursor.fetch()
   
         console.log("getNodes called")
+        console.log(nodesArray[0].hello._service.paged_traverse)
+
         // [ { hello: {
         //       _service: {
-        //         paged_traverse: [Object],
+        //         paged_traverse: {
+        //           key: 'paged_traverse',
+        //           endpoint: 'http://localhost:7474/db/data/node/36/paged/traverse/{returnType}{?pageSize,leaseTime}',
+        //           _db: 
+        //            { ...,
+        //              __service: 
+        //               { node: [Object],
+        //                 node_index: [Object],
+        //                 relationship_index: [Object],
+        //                 extensions_info: [Object],
+        //                 relationship_types: [Object],
+        //                 batch: [Object],
+        //                 cypher: [Object],
+        //                 indexes: [Object],
+        //                 constraints: [Object],
+        //                 transaction: [Object],
+        //                 node_labels: [Object],
+        //                 neo4j_version: [Object]
+        //               },
+        //              ... }
+        //             }
+        //           },
         //         outgoing_relationships: [Object],
         //         outgoing_typed_relationships: [Object],
         //         create_relationship: [Object],
@@ -76,13 +99,13 @@ if (Meteor.isServer) {
         // , ... }
         // , ... ]
         // 
-        // NOTE: The _service property contains circular references.
-        // Many of its sub-properties are objects with a _db property
-        // which in turn has a _service property.
+        // NOTE: The sub-properties of the _service property are 
+        // objects with a _db property which in turn has a _service
+        // property, which creates a circular reference.
         // As a result, it cannot be stringified as it is: the _db
-        // sub-properties need to be dropped.
+        // sub-properties first need to be dropped. In any case, the
+        // _db object is meaningless in the client.
         
-        var filter = {_service: {filter: {}, drop: ["paged_traverse", "outgoing_relationships", "outgoing_typed_relationships", "create_relationship", "labels", "traverse", "all_relationships", "all_typed_relationships", "property", "self", "incoming_relationships", "properties", "incoming_typed_relationships"]}}
         var nodes = []
         var ids = []
         var keys
@@ -91,11 +114,12 @@ if (Meteor.isServer) {
         nodesArray.forEach(function (object) { // , index, array) {
           keys = Object.keys(object)
           for (var ii=0, key; key=keys[ii]; ii++) {
-            node = object[key]
+           console.log("**********")
+           node = object[key]
             if (node.labels instanceof Array) {
               if (ids.indexOf(node.id) < 0) {
                 // This node is not in the nodes array yet. Add it.
-                node = clone(node, filter, [])
+                node = clone(node)
                 nodes.push(node)
                 ids.push(node.id)
               }
@@ -107,36 +131,24 @@ if (Meteor.isServer) {
         //console.log(JSON.stringify(nodes))
         return nodes
 
-        function clone(node, filter, drop) {
-          drop.push("_db")
+        function clone(node) {
           var copy = {}
           var keys = Object.keys(node)
-          var special = Object.keys(filter)
-          var subFilter
-            , subDrop
+          var value
           
           keys.forEach(function (key, index, array){
-            console.log("******")
-            if (drop.indexOf(key) < 0){
-              if (special.indexOf(key) < 0) {
-                // Standard treatment
-                console.log(key, node[key])
-                copy[key] = node[key]
+            if (key !== "_db") {
+              value = node[key]
+
+              if (typeof value === "object") {
+                // Ensure that the object contains no _db property
+                console.log("Dropping the _db object from", key)
+                copy[key] = clone(value)
               } else {
-                // Special treatment
-                subFilter = filter[key]
-                subDrop = subFilter.drop || []
-                subFilter = subFilter.filter || {}
-                copy[key] = clone(node[key], subFilter, subDrop)
+                // Standard treatment
+                // console.log(key, node[key])
+                copy[key] = value
               }
-            } else { 
-              // Drop this key
-              // try {
-              //   json = JSON.stringify(node[key])
-              // } catch(error) {
-              //   return clone(node[key], {}, [])
-              // }
-              // console.log("drop", key, json)
             }
           })
 
